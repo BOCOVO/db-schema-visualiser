@@ -73,6 +73,40 @@ const DiagramWrapper = ({ children }: DiagramWrapperProps) => {
     stageStateStore.set({ scale: newScale, position: newPos });
   };
 
+  const fitToView = () => {
+    if (stageRef.current != null) {
+      const stage = stageRef.current;
+      const container = stage.container();
+      const containerWidth = container.offsetWidth;
+      const containerHeight = container.offsetHeight;
+
+      const contentBounds = stage.getClientRect({ relativeTo: stage });
+      contentBounds.x = contentBounds.x - DIAGRAM_PADDING;
+      contentBounds.y = contentBounds.y - DIAGRAM_PADDING;
+      contentBounds.width = contentBounds.width + 2 * DIAGRAM_PADDING;
+      contentBounds.height = contentBounds.height + 2 * DIAGRAM_PADDING;
+      const scaleX = containerWidth / contentBounds.width;
+      const scaleY = containerHeight / contentBounds.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      stage.scale({ x: scale, y: scale });
+      stage.position({
+        x:
+          (containerWidth - contentBounds.width * scale) / 2 -
+          contentBounds.x * scale,
+        y:
+          (containerHeight - contentBounds.height * scale) / 2 -
+          contentBounds.y * scale,
+      });
+      stage.batchDraw();
+      stageStateStore.set({ scale, position: stage.position() });
+    }
+  };
+
+  useEffect(() => {
+    fitToView();
+  }, [windowWidth, windowHeight]);
+
   return (
     <main
       className={`relative flex flex-col items-center ${theme === Theme.dark ? "dark" : ""}`}
@@ -94,7 +128,7 @@ const DiagramWrapper = ({ children }: DiagramWrapperProps) => {
         </Layer>
       </Stage>
 
-      <Toolbar />
+      <Toolbar onFitToView={fitToView} />
     </main>
   );
 };
