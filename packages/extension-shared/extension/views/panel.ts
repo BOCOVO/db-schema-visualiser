@@ -80,7 +80,7 @@ export class MainPanel {
 
         if (MainPanel.currentPanel !== undefined) {
           MainPanel.currentPanel._lastTimeout = setTimeout(() => {
-            MainPanel.publishSchema(event.document);
+            void MainPanel.publishSchema(event.document);
           }, DIAGRAM_UPDATER_DEBOUNCE_TIME);
         }
       }
@@ -147,7 +147,7 @@ export class MainPanel {
       MainPanel.registerDiagramUpdaterOnfFileChange();
     }
 
-    MainPanel.publishSchema(editor.document);
+    void MainPanel.publishSchema(editor.document);
   }
 
   static getCurrentEditor(): TextEditor | undefined {
@@ -161,8 +161,39 @@ export class MainPanel {
     return editor;
   }
 
-  static publishSchema = (document: TextDocument): void => {
-    const code = document.getText();
+  static publishSchema = async (document: TextDocument): Promise<void> => {
+    let code = document.getText();
+
+    switch (document.languageId) {
+      // if document is prisma file and the parent folder is "schema" folder, then read all *.prisma files in the folder and merge them.
+      case "prisma": {
+        // Get the parent folder name of the file
+        const folderPath = document.uri.fsPath.split("/");
+        const folderName = folderPath[folderPath.length - 2];
+
+        if (folderName !== "schema") break;
+
+        const schemaFolder = folderPath
+          .slice(0, folderPath.length - 1)
+          .join("/");
+
+        // Get all prisma files in the folder
+        const files = await workspace.findFiles(`**/*.prisma`);
+
+        // Clear code
+        code = "";
+
+        // Merge all prisma files
+        for (const uri of files) {
+          // Check file in the same folder
+          if (!uri.fsPath.includes(schemaFolder)) continue;
+          const buffer = await workspace.fs.readFile(uri);
+          code += "\n" + buffer.toString();
+        }
+        break;
+      }
+    }
+
     try {
       const schema = MainPanel.parseCode(code);
 
